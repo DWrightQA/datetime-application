@@ -116,7 +116,7 @@ vault_AWS_SECRET_ACCESS_KEY: "MY SECRET KEY"
 The application can then be deployed by running the following, adding in your 
 password as requested. 
 ```
-ansible-playbook playbooks/provision.yaml
+ansible-playbook playbooks/provision.yaml --ask-vault-pass
 ```
 
 
