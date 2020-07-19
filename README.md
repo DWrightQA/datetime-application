@@ -128,7 +128,7 @@ This is because ansible will create an api gateway resource but will be unable
 to manage it going forth without the id returned by the module. 
 
 
-There have been time when running this playbook has failed when AWS services
+There have been times when running this playbook have failed when AWS services
 have not been updated quick enough for ansible to pick up new variables. 
-Re-running the playbook will solve this. 
+Re-running the playbook will solve these issues. 
 
