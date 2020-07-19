@@ -1,0 +1,17 @@
+{
+    "domainName": "{{ domain }}", 
+    "regionalCertificateName": "{{ domain }}", 
+    "regionalCertificateArn": "{{certificate_arn }}", 
+    "endpointConfiguration": {
+        "types": [
+            "REGIONAL"
+        ], 
+        "vpcEndpointIds": [
+            ""
+        ]
+    }, 
+    "tags": {
+        "KeyName": "{{ domain }}"
+    }, 
+    "securityPolicy": "TLS_1_2"
+}

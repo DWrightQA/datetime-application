@@ -1,0 +1,32 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "logs:CreateLogGroup",
+            "Resource": "arn:aws:logs:{{ AWS_DEFAULT_REGION }}:{{ lambda_account_info.account }}:*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": [
+                "arn:aws:logs:{{ AWS_DEFAULT_REGION }}:{{ lambda_account_info.account }}:log-group:/aws/lambda/timestamp:*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:PutItem"
+            ],
+            "Resource": "arn:aws:dynamodb:{{ AWS_DEFAULT_REGION }}:{{ lambda_account_info.account }}:table/vf-datetime"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "lambda:InvokeFunction",
+            "Resource": "arn:aws:lambda:eu-west-2:656551852176:function:timestamp*"
+        }
+    ]
+}

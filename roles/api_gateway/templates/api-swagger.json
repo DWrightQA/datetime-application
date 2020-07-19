@@ -1,0 +1,42 @@
+{
+  "swagger" : "2.0",
+  "info" : {
+    "version" : "2020-07-13T20:14:04Z",
+    "title" : "timestamp_app"
+  },
+  "host" : "{{ domain }}",
+  "basePath": "/dev",
+  "schemes" : [ "https" ],
+  "paths" : {
+    "/app" : {
+      "post" : {
+        "produces" : [ "application/json" ],
+        "responses" : {
+          "201" : {
+            "description" : "201 response",
+            "schema" : {
+              "$ref" : "#/definitions/Empty"
+            }
+          }
+        },
+        "x-amazon-apigateway-integration" : {
+          "uri" : "arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/{{ timestamp_lambda_facts.ansible_facts.lambda_facts.function.timestamp.function_arn }}/invocations",
+          "responses" : {
+            "default" : {
+              "statusCode" : "201"
+            }
+          },
+          "passthroughBehavior": "when_no_match",
+          "httpMethod": "POST",
+          "type": "aws_proxy"
+        }
+      }
+    }
+  },
+  "definitions" : {
+    "Empty" : {
+      "type" : "object",
+      "title" : "Empty Schema"
+    }
+  }
+}

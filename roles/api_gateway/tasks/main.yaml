@@ -1,0 +1,117 @@
+- name: check if new certificate is required
+  aws_acm_info:
+    domain_name: "{{ domain }}"
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_DEFAULT_REGION }}'
+  register: acm_check_cert
+
+- set_fact:
+    current_acm_domains: "{{ acm_check_cert.certificates| json_query('[].domain_name')| join(',') }}"
+
+- include_tasks: new_cert.yaml
+  when: "domain not in current_acm_domains" 
+
+- name: fetch certificate info
+  aws_acm_info:
+    domain_name: '{{ domain }}'
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_DEFAULT_REGION }}'
+  register: certificate_info
+
+- set_fact:
+    certificate_arn: "{{ certificate_info | json_query('certificates[?domain_name == `' + domain + '`].certificate_arn') | join('') }}"
+
+- name: deploy timestamp api-gatewy configuration
+  aws_api_gateway:
+    api_id: '{{ api_gateway_id | default(omit) }}'
+    state: present
+    stage: dev
+    swagger_text: "{{ lookup('template', 'api-swagger.json') | to_json }}"
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_DEFAULT_REGION }}'
+  register: api_gateway_register
+
+- pause:
+    prompt: "Add this key/value pair into all vars::  api_gateway_id: {{ api_gateway_register.api_id }}  :"
+  when: api_gateway_id is undefined
+
+- set_fact:
+    api_gateway_id: "{{ api_gateway_register.api_id }}"
+  when: api_gateway_id is undefined
+
+- name: fetch the current account info
+  aws_caller_info:
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_DEFAULT_REGION }}'
+  register: api_gateway_account_info
+
+- name: add permissions to timestamp api-gatewy 
+  lambda_policy:
+    state: "{{ state | default('present') }}"
+    function_name: timestamp
+    statement_id: lambda-trigger-api-gateway
+    action: lambda:InvokeFunction
+    principal: apigateway.amazonaws.com
+    source_arn: "arn:aws:execute-api:{{ AWS_DEFAULT_REGION }}:{{ api_gateway_account_info.account }}:{{ api_gateway_id }}/*/*/app"
+  register: lambda_policy_action
+
+- name: template create-domain-name json
+  template:
+    src: create-domain.json
+    dest: /tmp/create-domain.json
+
+- name: create custom domain name in api gateway
+  shell: 'aws apigateway create-domain-name --cli-input-json file:///tmp/create-domain.json'
+  environment:
+    AWS_ACCESS_KEY_ID: '{{ AWS_ACCESS_KEY_ID }}'
+    AWS_SECRET_ACCESS_KEY: '{{ AWS_SECRET_ACCESS_KEY }}'
+    AWS_DEFAULT_REGION: '{{ AWS_DEFAULT_REGION }}'
+  register: api_gateway_custom_domain
+  failed_when: false
+  changed_when:
+  - not "The domain name you provided already exists" in api_gateway_custom_domain.stderr
+
+- name: wait for request to be confirmed
+  wait_for:
+    timeout: 10
+
+- name: update api mappings in custom domain name in api gateway
+  shell: 'aws apigatewayv2 create-api-mapping --domain-name api.gogotcha.co.uk --api-id {{ api_gateway_id }} --stage dev'
+  environment:
+    AWS_ACCESS_KEY_ID: '{{ AWS_ACCESS_KEY_ID }}'
+    AWS_SECRET_ACCESS_KEY: '{{ AWS_SECRET_ACCESS_KEY }}'
+    AWS_DEFAULT_REGION: '{{ AWS_DEFAULT_REGION }}'
+  register: api_gateway_custom_domain_update
+  failed_when: false
+  changed_when:
+  - not "Only one ApiMapping is allowed if the key is empty" in api_gateway_custom_domain.stderr
+
+- name: wait for request to be confirmed
+  wait_for:
+    timeout: 10
+
+- name: get custom domain name url in api gateway
+  shell: "aws apigatewayv2 get-domain-names | jq -r '.Items[] | select(.DomainName==\"{{ domain }}\") | .DomainNameConfigurations[] | select(.CertificateName==\"{{ domain }}\") | .ApiGatewayDomainName'"
+  environment:
+    AWS_ACCESS_KEY_ID: '{{ AWS_ACCESS_KEY_ID }}'
+    AWS_SECRET_ACCESS_KEY: '{{ AWS_SECRET_ACCESS_KEY }}'
+    AWS_DEFAULT_REGION: '{{ AWS_DEFAULT_REGION }}'
+  changed_when: false
+  register: api_gateway_url
+
+- name: "create route53 cname to point {{ domain }} to {{ api_gateway_url.stdout }}"
+  route53:
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    zone: '{{ domain_suffix }}'
+    record: '{{ domain }}'
+    type: CNAME
+    ttl: 60
+    value: '{{  api_gateway_url.stdout }}'
+    state: present
+    overwrite: yes
+    wait: yes

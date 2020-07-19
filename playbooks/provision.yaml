@@ -1,0 +1,9 @@
+- hosts: localhost
+  gather_facts: no
+  vars:
+    domain: "api.{{ domain_suffix }}"
+    domain_suffix: "gogotcha.co.uk"
+  roles:
+  - dynamodb
+  - lambda
+  - api_gateway

@@ -1,0 +1,2 @@
+roles/lambda/files/main.zip
+inventory/group_vars/all/vault.yaml

@@ -1,0 +1,13 @@
+- name: create dynamodb table for persistent storage
+  dynamodb_table:
+    name: vf-datetime
+    region: '{{ AWS_DEFAULT_REGION }}'
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    hash_key_name: id
+    hash_key_type: STRING
+    range_key_name: timestamp
+    range_key_type: STRING
+    read_capacity: 10
+    write_capacity: 10
+    state: present

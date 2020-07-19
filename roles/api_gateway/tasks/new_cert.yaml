@@ -1,0 +1,36 @@
+
+- name: request new certificate in cert manager
+  shell: "aws acm request-certificate --domain-name {{ domain }} --validation-method DNS" 
+  register: acm_cert_request
+  environment:
+    AWS_ACCESS_KEY_ID: '{{ AWS_ACCESS_KEY_ID }}'
+    AWS_SECRET_ACCESS_KEY: '{{ AWS_SECRET_ACCESS_KEY }}'
+    AWS_DEFAULT_REGION: '{{ AWS_DEFAULT_REGION }}'
+
+- name: wait for request to be confirmed
+  wait_for:
+    timeout: 10
+
+- name: get dns request for new certificate in cert manager
+  shell: "aws acm describe-certificate --certificate-arn {{ acm_cert_request.stdout | from_json  | json_query('CertificateArn') }}" 
+  register: acm_cert_dns_request
+  environment:
+    AWS_ACCESS_KEY_ID: '{{ AWS_ACCESS_KEY_ID }}'
+    AWS_SECRET_ACCESS_KEY: '{{ AWS_SECRET_ACCESS_KEY }}'
+    AWS_DEFAULT_REGION: '{{ AWS_DEFAULT_REGION }}'
+
+- set_fact:
+    acm_cert_record_name: "{{ acm_cert_dns_request.stdout | from_json  | json_query('Certificate.DomainValidationOptions[*].ResourceRecord.Name') | join('') }}" 
+    acm_cert_record_value: "{{ acm_cert_dns_request.stdout  | from_json | json_query('Certificate.DomainValidationOptions[*].ResourceRecord.Value') | join('') }}"
+
+- name: create required dns record in route53
+  route53:
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    zone: '{{ domain_suffix }}'
+    record: '{{ acm_cert_record_name }}'
+    type: CNAME
+    ttl: 60
+    value: '{{ acm_cert_record_value }}'
+    state: present
+    wait: yes

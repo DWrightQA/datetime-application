@@ -1,0 +1,69 @@
+
+- name: zip main.py 
+  archive:
+    path: '{{ role_path }}/files/main.py'
+    dest: '{{ role_path }}/files/main.zip'
+    mode: 0777
+    format: zip
+  delegate_to: localhost
+
+- name: fetch the current account info
+  aws_caller_info:
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_DEFAULT_REGION }}'
+  register: lambda_account_info
+
+- name: Create lambda iam role for dynamodb 
+  iam_role:
+    name: lambda-dynamodb
+    assume_role_policy_document: "{{ lookup('template','iam-role-trust.json') }}"
+    description: lambda iam role for putItem to vf-datetime dynamodb table
+
+- name: apply lambda iam policies
+  iam_policy:
+    iam_type: role
+    iam_name: "lambda-dynamodb"
+    policy_name: "lambda-dynamodb"
+    state: present
+    policy_json: "{{ lookup( 'template', 'iam-role-policies.json') | to_json }}"
+
+- name: create lambda function
+  lambda:
+    name: 'timestamp'
+    state: present
+    zip_file: '{{ role_path }}/files/main.zip'
+    runtime: 'python3.8'
+    role: 'arn:aws:iam::{{ lambda_account_info.account }}:role/lambda-dynamodb'
+    handler: 'main.handler'
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_DEFAULT_REGION }}'
+  delegate_to: localhost
+  failed_when: false
+
+- name: wait for request to be confirmed
+  wait_for:
+    timeout: 10
+
+- name: ensure lambda function is correct
+  lambda:
+    name: 'timestamp'
+    state: present
+    zip_file: '{{ role_path }}/files/main.zip'
+    runtime: 'python3.8'
+    role: 'arn:aws:iam::{{ lambda_account_info.account }}:role/lambda-dynamodb'
+    handler: 'main.handler'
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_DEFAULT_REGION }}'
+  delegate_to: localhost
+
+- name: fetch lambda facts
+  lambda_facts:
+    function_name: timestamp
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_DEFAULT_REGION }}'
+  register: timestamp_lambda_facts
+  
