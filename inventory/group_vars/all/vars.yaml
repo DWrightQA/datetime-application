@@ -1,4 +1,4 @@
-api_gateway_id: kf94ywkew6
+# api_gateway_id: 
 
 AWS_DEFAULT_REGION: eu-west-2
 AWS_ACCESS_KEY_ID: '{{ vault_AWS_ACCESS_KEY_ID }}'
